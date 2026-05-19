@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LZ78 Сжатие и Распаковка</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        .header {
+            background: #2d3748;
+            color: white;
+            padding: 20px 30px;
+            border-bottom: 4px solid #48bb78;
+        }
+        .header h1 {
+            margin: 0 0 5px 0;
+            font-size: 28px;
+        }
+        .header p {
+            margin: 0;
+            opacity: 0.9;
+            font-size: 14px;
+        }
+        .content {
+            padding: 30px;
+        }
+        .section {
+            margin-bottom: 25px;
+        }
+        .section label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #2d3748;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        textarea, input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e2e8f0;
+            border-radius: 10px;
+            font-size: 14px;
+            font-family: 'Courier New', monospace;
+            transition: all 0.3s;
+        }
+        textarea:focus, input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102,126,234,0.1);
+        }
+        textarea {
+            resize: vertical;
+            min-height: 120px;
+        }
+        .row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 25px;
+        }
+        .button-group {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            flex: 1;
+            min-width: 120px;
+        }
+        button:hover {
+            background: #5a67d8;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+        button:active {
+            transform: translateY(0);
+        }
+        .btn-reset {
+            background: #48bb78;
+        }
+        .btn-reset:hover {
+            background: #38a169;
+        }
+        .btn-clear {
+            background: #ed8936;
+        }
+        .btn-clear:hover {
+            background: #dd6b20;
+        }
+        .output-area {
+            background: #f7fafc;
+            border: 2px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            white-space: pre-wrap;
+            word-break: break-all;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .output-area h3 {
+            margin: 0 0 10px 0;
+            font-size: 14px;
+            color: #4a5568;
+        }
+        .code-block {
+            background: #2d3748;
+            color: #68d391;
+            padding: 12px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            overflow-x: auto;
+        }
+        .stats {
+            display: flex;
+            gap: 20px;
+            margin-top: 15px;
+            padding: 15px;
+            background: #edf2f7;
+            border-radius: 10px;
+        }
+        .stat {
+            flex: 1;
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #667eea;
+        }
+        .stat-label {
+            font-size: 12px;
+            color: #4a5568;
+            margin-top: 5px;
+        }
+        .alert {
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+        .alert-info {
+            background: #bee3f8;
+            border-left: 4px solid #3182ce;
+            color: #2c5282;
+        }
+        hr {
+            margin: 20px 0;
+            border: none;
+            border-top: 2px solid #e2e8f0;
+        }
+        @media (max-width: 768px) {
+            .row {
+                grid-template-columns: 1fr;
+            }
+            .content {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>📦 LZ78 Словарное кодирование</h1>
+        <p>Алгоритм Лемпела-Зива 1978 года | Сжатие с динамическим словарём</p>
+    </div>
+    <div class="content">
+        <div class="alert alert-info">
+            💡 <strong>Как работает LZ78:</strong> Словарь строится динамически. Каждый код = <code>(позиция_в_словаре, следующий_символ)</code>.
+            Позиция 0 — пустая строка. Размер словаря ограничен.
+        </div>
+
+        <div class="row">
+            <div class="section">
+                <label>📝 Входной текст</label>
+                <textarea id="inputText" placeholder="Например: КРАСНАЯ КРАСКА или ABABABAB...">КРАСНАЯ КРАСКА</textarea>
+            </div>
+            <div class="section">
+                <label>📏 Максимальный размер словаря</label>
+                <input type="number" id="dictSize" value="256" min="1" max="1000" step="1">
+                <small style="color: #718096;">Чем больше словарь, тем выше сжатие, но больше памяти</small>
+            </div>
+        </div>
+
+        <div class="button-group">
+            <button id="compressBtn">🔒 Сжать (LZ78)</button>
+            <button id="decompressBtn">🔓 Распаковать</button>
+            <button id="resetBtn" class="btn-reset">🔄 Сброс примеров</button>
+            <button id="clearBtn" class="btn-clear">🗑 Очистить всё</button>
+        </div>
+
+        <div class="row">
+            <div class="section">
+                <label>📤 Коды LZ78 (результат сжатия)</label>
+                <div id="codesOutput" class="output-area">
+                    <h3>Коды: (позиция, символ)</h3>
+                    <div style="color: #718096;">Нажмите "Сжать"</div>
+                </div>
+            </div>
+            <div class="section">
+                <label>📥 Распакованный текст</label>
+                <div id="decompressedOutput" class="output-area">
+                    <h3>Восстановленный текст</h3>
+                    <div style="color: #718096;">Нажмите "Распаковать"</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="stats">
+            <div class="stat">
+                <div class="stat-value" id="originalSize">0</div>
+                <div class="stat-label">Исходный размер (байт)</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value" id="compressedSize">0</div>
+                <div class="stat-label">Сжатый размер (байт)</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value" id="ratio">0</div>
+                <div class="stat-label">Коэффициент сжатия (исходный/сжатый)</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value" id="dictUsed">0</div>
+                <div class="stat-label">Использовано словаря</div>
+            </div>
+        </div>
+
+        <hr>
+
+        <details>
+            <summary style="cursor: pointer; color: #667eea; font-weight: 600;">📖 Примеры для тестирования</summary>
+            <div style="margin-top: 10px; padding: 10px; background: #f7fafc; border-radius: 8px;">
+                <p><strong>Пример 1:</strong> "ABABABAB" (размер словаря 5)</p>
+                <p><strong>Пример 2:</strong> "TOBEORNOTTOBEORTOBEORNOT" (классический LZ78)</p>
+                <p><strong>Пример 3:</strong> "aaaaaaa" (много повторов)</p>
+                <p><strong>Пример 4:</strong> Из лекции: "КРАСНАЯ КРАСКА"</p>
+                <button id="example1Btn" style="background:#48bb78; margin-right:10px;">Вставить Пример 1</button>
+                <button id="example2Btn" style="background:#48bb78; margin-right:10px;">Вставить Пример 2</button>
+                <button id="example3Btn" style="background:#48bb78;">Вставить Пример 3</button>
+            </div>
+        </details>
+    </div>
+</div>
+
+<script src="LZ78.js"></script>
+<script>
+    // ============================================================
+    // UI Обработчики (используют функции из LZ78.js)
+    // ============================================================
+    const inputText = document.getElementById('inputText');
+    const dictSizeInput = document.getElementById('dictSize');
+    const codesOutput = document.getElementById('codesOutput');
+    const decompressedOutput = document.getElementById('decompressedOutput');
+    const originalSizeSpan = document.getElementById('originalSize');
+    const compressedSizeSpan = document.getElementById('compressedSize');
+    const ratioSpan = document.getElementById('ratio');
+    const dictUsedSpan = document.getElementById('dictUsed');
+
+    let lastEncodedCodes = null;
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        return str.replace(/[&<>]/g, function(m) {
+            if (m === '&') return '&amp;';
+            if (m === '<') return '&lt;';
+            if (m === '>') return '&gt;';
+            return m;
+        });
+    }
+
+    function compress() {
+        try {
+            let text = inputText.value;
+            let maxDictSize = parseInt(dictSizeInput.value);
+
+            if (isNaN(maxDictSize) || maxDictSize < 1) {
+                alert("Размер словаря должен быть положительным числом");
+                return;
+            }
+
+            if (!text) {
+                codesOutput.innerHTML = '<h3>Коды: (позиция, символ)</h3><div style="color:#ed8936;">⚠️ Введите текст для сжатия</div>';
+                return;
+            }
+
+            let result = lz78Encode(text, maxDictSize);
+            lastEncodedCodes = result.codes;
+
+            let formattedCodes = formatCodes(result.codes);
+            codesOutput.innerHTML = `<h3>Коды: (позиция, символ)</h3>
+                                      <div class="code-block">${escapeHtml(formattedCodes)}</div>
+                                      <div style="margin-top:10px; font-size:12px; color:#718096;">
+                                      Всего кодов: ${result.codes.length} |
+                                      Словарь: ${result.dictionary.length}/${maxDictSize} фраз
+                                      </div>`;
+
+            let stats = calculateCompressionRatio(text, result.codes);
+            originalSizeSpan.textContent = stats.originalSize;
+            compressedSizeSpan.textContent = stats.compressedSize;
+            ratioSpan.textContent = stats.compressionRatio;
+            dictUsedSpan.textContent = `${result.dictionary.length}/${maxDictSize}`;
+
+        } catch (e) {
+            console.error(e);
+            alert("Ошибка при сжатии: " + e.message);
+        }
+    }
+
+    function decompress() {
+        try {
+            if (!lastEncodedCodes) {
+                alert("Сначала выполните сжатие (нажмите 'Сжать')");
+                return;
+            }
+
+            let maxDictSize = parseInt(dictSizeInput.value);
+            if (isNaN(maxDictSize) || maxDictSize < 1) {
+                alert("Размер словаря должен быть положительным числом");
+                return;
+            }
+
+            let decompressed = lz78Decode(lastEncodedCodes, maxDictSize);
+
+            decompressedOutput.innerHTML = `<h3>Восстановленный текст</h3>
+                                             <div style="font-family: 'Courier New', monospace; font-size: 14px;">${escapeHtml(decompressed)}</div>
+                                             <div style="margin-top:10px; font-size:12px; color:#48bb78;">
+                                             ✅ Длина: ${decompressed.length} символов
+                                             </div>`;
+
+            if (decompressed === inputText.value) {
+                decompressedOutput.innerHTML += `<div style="margin-top:8px; color:#38a169; font-weight:bold;">✓ Исходный и восстановленный текст совпадают!</div>`;
+            } else {
+                decompressedOutput.innerHTML += `<div style="margin-top:8px; color:#ed8936; font-weight:bold;">⚠️ Восстановленный текст отличается от исходного. Проверьте размер словаря.</div>`;
+            }
+
+        } catch (e) {
+            console.error(e);
+            alert("Ошибка при распаковке: " + e.message);
+        }
+    }
+
+    function resetExamples() {
+        inputText.value = "КРАСНАЯ КРАСКА";
+        dictSizeInput.value = "256";
+        lastEncodedCodes = null;
+        codesOutput.innerHTML = '<h3>Коды: (позиция, символ)</h3><div style="color:#718096;">Нажмите "Сжать"</div>';
+        decompressedOutput.innerHTML = '<h3>Восстановленный текст</h3><div style="color:#718096;">Нажмите "Распаковать"</div>';
+        originalSizeSpan.textContent = "0";
+        compressedSizeSpan.textContent = "0";
+        ratioSpan.textContent = "0";
+        dictUsedSpan.textContent = "0/0";
+    }
+
+    function clearAll() {
+        inputText.value = "";
+        dictSizeInput.value = "256";
+        lastEncodedCodes = null;
+        codesOutput.innerHTML = '<h3>Коды: (позиция, символ)</h3><div style="color:#718096;">Нажмите "Сжать"</div>';
+        decompressedOutput.innerHTML = '<h3>Восстановленный текст</h3><div style="color:#718096;">Нажмите "Распаковать"</div>';
+        originalSizeSpan.textContent = "0";
+        compressedSizeSpan.textContent = "0";
+        ratioSpan.textContent = "0";
+        dictUsedSpan.textContent = "0/0";
+    }
+
+    function setExample(text) {
+        inputText.value = text;
+        lastEncodedCodes = null;
+        codesOutput.innerHTML = '<h3>Коды: (позиция, символ)</h3><div style="color:#718096;">Нажмите "Сжать"</div>';
+        decompressedOutput.innerHTML = '<h3>Восстановленный текст</h3><div style="color:#718096;">Нажмите "Распаковать"</div>';
+    }
+
+    document.getElementById('compressBtn').addEventListener('click', compress);
+    document.getElementById('decompressBtn').addEventListener('click', decompress);
+    document.getElementById('resetBtn').addEventListener('click', resetExamples);
+    document.getElementById('clearBtn').addEventListener('click', clearAll);
+    document.getElementById('example1Btn').addEventListener('click', () => setExample("ABABABAB"));
+    document.getElementById('example2Btn').addEventListener('click', () => setExample("TOBEORNOTTOBEORTOBEORNOT"));
+    document.getElementById('example3Btn').addEventListener('click', () => setExample("aaaaaaaaaa"));
+
+    setTimeout(() => {
+        compress();
+    }, 100);
+</script>
+</body>
+</html>
